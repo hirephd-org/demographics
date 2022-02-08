@@ -7,50 +7,45 @@ from matplotlib import pyplot as plt
 extension = 'csv'
 all_filenames = [i for i in glob.glob('*.{}'.format(extension))]
 
-#combine all files in the list
-combined_csv = pd.concat([pd.read_csv(f) for f in all_filenames ])
-
-#get only those datasets where we collected prefix info
-prefixes = combined_csv[['Order Date', 'Prefix']]
-prefixes = prefixes[['Prefix']].fillna(value='Unknown')
-
-
-def convert_percent(report, column):
-    """
-    This function will take the raw data and create a dataframe with a summary of data showing the percentages of each answer.
-    The function will return a pandas dataframe.
-    """
-    df = report[column].value_counts(normalize = True) 
-    df = pd.DataFrame(df).reset_index()
-    df.columns = ['answer', 'percent']
-    df['percent'] = df['percent']*100
-    #df.sort_values('answer')
-    return df
+#loop through each csv file to create a separate dataframe 
+all_csvs = []
+for filename in all_filenames:
+    df_raw = pd.read_csv(filename)
+    df = df_raw[['Order Date', 'Prefix']]
+    df['filename'] = filename
+    prefixes = df[['Prefix', 'Order Date', 'filename']].fillna(value='Unknown')
+    all_csvs.append(prefixes)
 
 
-all_prefixes = convert_percent(prefixes, 'Prefix')
+all_csvs = pd.concat(all_csvs)
 
-#create a dataframe where we combine all Ms/Miss/Mrs and Dr/Rev/Prof/Mx as "other"
-females = all_prefixes.iloc[['1', '4', '5']].sum()
-males = all_prefixes.iloc[['0']].sum()
-other = all_prefixes.iloc[['2', '3', '6', '7', '8']].sum()
-#create a new dataframe with the sums
-gender = pd.concat([females, males, other], axis =1).T
+all_prefix = all_csvs[['Prefix', 'filename']]
 
-#change the name of the rows 
-gender.at[0,'answer']='Female'
-gender.at[1, 'answer'] = 'Male'
-gender.at[2, 'answer'] = 'Unknown'
+#change all Ms/Miss/Mrs to 'female' and all Mrs to 'male' and the rest to "Unknown"
+all_gender = all_prefix.replace({'Prefix' : { 'Mr.' : 'Male', 'Ms.' : 'Female', 'Miss' : 'Female', 'Mrs.' : 'Female', 'Dr.' : 'Unknown','Rev.' : 'Unknown','Prof.' : 'Unknown' ,'Mx.' : 'Unknown'   }})
 
-#create a pie chart
-fig = plt.figure(figsize = [6,6])
-ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])    
-patches, texts, pcts = ax.pie(gender['percent'], autopct='%1.0f%%', pctdistance=1.1)
-plt.legend(gender['answer'], bbox_to_anchor=(1,0.15), loc="center right", fontsize=14, 
-         bbox_transform=plt.gcf().transFigure)
-plt.setp(pcts, fontweight='bold')
-plt.title('All HirePhD. Events (except events 8, 9, 10)')
+#Get the count of each prefix for each event
+avg = all_gender.groupby(['filename', 'Prefix'], as_index=False).size()
+#add new column for sum of all prefixes per event
+avg['sum']=avg.groupby(['filename'])['size'].transform('sum')
+#calculate the percentage per prefix for each event
+avg['percentage'] = avg['size']/avg['sum']*100
+#create a new column for event number
+avg['event'] = avg['filename'].map(lambda x: x.rstrip('_report.csv'))
+
+#prepare dataframe for creating chart
+df_avg = avg[['event', 'Prefix', 'percentage']]
+df_avg = df_avg.pivot(index = 'event', columns = 'Prefix', values = 'percentage')
+df_avg = df_avg.reset_index()
+df_avg['event'] = df_avg.event.astype(int)
+df_avg = df_avg.sort_values(by=['event'])
+df_avg = df_avg.set_index('event')
+
+#create a stacked bar chart 
+fig = df_avg.plot(kind='bar', stacked=True, figsize = (8,6)).legend(bbox_to_anchor=(1, 0.5))
 plt.show()
-fig.savefig('all_events_gender.png', format='png', dpi=300, bbox_inches="tight")
+fig.figure.savefig('gender_per_event.png', format='png', dpi=300, bbox_inches="tight")
+
+   
 
 
