@@ -42,6 +42,8 @@ gender.at[0,'answer']='Female'
 gender.at[1, 'answer'] = 'Male'
 gender.at[2, 'answer'] = 'Unknown'
 
+#gender.to_csv('all_events_gender.csv', index=False)
+
 #create a pie chart
 fig = plt.figure(figsize = [6,6])
 ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])    

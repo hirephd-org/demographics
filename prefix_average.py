@@ -41,6 +41,8 @@ df_avg['event'] = df_avg.event.astype(int)
 df_avg = df_avg.sort_values(by=['event'])
 df_avg = df_avg.set_index('event')
 
+#df_avg.to_csv('gender_per_event.csv', index = True)
+
 #create a stacked bar chart 
 fig = df_avg.plot(kind='bar', stacked=True, figsize = (8,6)).legend(bbox_to_anchor=(1, 0.5))
 plt.show()
